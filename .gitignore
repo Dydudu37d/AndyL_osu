@@ -1,3 +1,5 @@
 __pycache__/
 .venv/
-models/
+models/*
+models/osu_model_temp.pth
+models/osu_model.pth
