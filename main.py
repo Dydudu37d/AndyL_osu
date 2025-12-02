@@ -32,15 +32,15 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # 全局配置参数
 CONFIG = {
     'image_size': (160, 90),  # 16:9宽屏尺寸
-    'num_classes': 3,
-    'num_anchors': 5,
+    'num_classes': 4,
+    'num_anchors': 4,
     'confidence_threshold': 0.5,
     'nms_threshold': 0.45,
     'batch_size': 1024,
     'num_epochs': 500,
     'learning_rate': 0.001,
     # 类别名称映射
-    'class_names': ['circle', 'slider', 'spinner']
+    'class_names': ['circle', 'slider', 'spinner', 'back']
 }
 
 class OsuNet(nn.Module):
@@ -417,7 +417,8 @@ def train_model(model, train_loader, num_epochs=CONFIG['num_epochs'],
     
     # 调整类别权重，重点关注表现最差的类别
     # 基于评估结果，slider和spinner表现为0，需要大幅增加权重
-    class_weights = torch.tensor([1.0, 3.0, 3.0], device=device)  # 大幅增加slider和spinner类别的权重
+# 设置类别权重，解决类别不平衡问题
+    class_weights = torch.tensor([1.0, 3.0, 3.0, 3.0], device=device)  # 大幅增加slider、spinner和back类别的权重
     
     # 增加训练轮数，让模型有更多时间学习复杂特征
     num_epochs = max(num_epochs, 50)  # 确保至少训练50轮
@@ -802,8 +803,8 @@ def capture_screen():
             # 只捕获屏幕中心区域，减少处理数据量
             width = monitor['width']
             height = monitor['height']
-            crop_width = int(width)  # 只捕获60%宽度
-            crop_height = int(height)  # 只捕获60%高度
+            crop_width = int(width)
+            crop_height = int(height)
             
             # 计算中心区域坐标
             left = int((width - crop_width) / 2)
@@ -861,6 +862,8 @@ def parse_predictions(predictions, device=torch.device('cuda' if torch.cuda.is_a
         min_confidence = 0.7  # slider需要更高置信度，减少误判
     elif predicted_class.item() == 2:  # spinner
         min_confidence = 0.8  # spinner需要最高置信度
+    elif predicted_class.item() == 3:
+        min_confidence = 0.7
     else:
         min_confidence = CONFIG['confidence_threshold']
     
@@ -1107,7 +1110,8 @@ def run(model: nn.Module):
                                 if spinner_hold:
                                     pyautogui.mouseUp()
                                     spinner_hold = False
-                        
+                        elif current_class == 3:
+                            pass
                         else:
                             # 重置所有状态
                             pyautogui.mouseUp()

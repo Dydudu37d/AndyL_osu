@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
+import torch.nn as nn
 
 # 确保设备配置
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -15,84 +16,75 @@ TRAIN_IMG_PATH = 'train_img'
 
 # 直接定义所需的配置
 CONFIG = {
-    'num_classes': 3,
-    'class_names': ['circle', 'slider', 'spinner'],
+    'num_classes': 4,
+    'class_names': ['circle', 'slider', 'spinner', 'back'],
     'image_size': (160, 90),
     'batch_size': 128,
     'num_epochs': 50
 }
 
 # 直接定义OsuNet模型类，与main.py中的完全一致
-class OsuNet(torch.nn.Module):
-    """Osu游戏对象分类网络 - 优化spinner识别"""
-    def __init__(self, num_classes=3):
+class OsuNet(nn.Module):
+    """Osu游戏对象分类网络 - 优化：简化网络结构，减少计算量"""
+    def __init__(self, num_classes=CONFIG['num_classes']):
         super().__init__()
         self.num_classes = num_classes
         
-        # 增强的卷积骨干网络 - 支持16:9宽屏输入，增加深度和通道数
-        self.backbone = torch.nn.Sequential(
-            # 输入 3x160x90 -> 输出 32x80x45
-            torch.nn.Conv2d(3, 32, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(32),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Conv2d(32, 32, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(32),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+        # 简化的卷积骨干网络，减少通道数和层数
+        self.backbone = nn.Sequential(
+            # 输入 3x160x90 -> 输出 16x80x45
+            nn.Conv2d(3, 16, kernel_size=3, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             
-            # 输入 32x80x45 -> 输出 64x40x22
-            torch.nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(64),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Conv2d(64, 64, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(64),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+            # 输入 16x80x45 -> 输出 32x40x22
+            nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             
-            # 输入 64x40x22 -> 输出 128x20x11
-            torch.nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(128),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Conv2d(128, 128, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(128),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+            # 输入 32x40x22 -> 输出 64x20x11
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             
-            # 输入 128x20x11 -> 输出 256x10x5
-            torch.nn.Conv2d(128, 256, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(256),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Conv2d(256, 256, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(256),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            # 输入 256x10x5 -> 输出 512x5x2
-            torch.nn.Conv2d(256, 512, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(512),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Conv2d(512, 512, kernel_size=3, padding=1),
-            torch.nn.BatchNorm2d(512),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+            # 输入 64x20x11 -> 输出 128x10x5
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
         )
         
-        # 增强的分类头，增加神经元数量和dropout层
-        self.classifier = torch.nn.Sequential(
-            torch.nn.AdaptiveAvgPool2d((1, 1)),  # 全局平均池化，输出 [batch_size, 512, 1, 1]
-            torch.nn.Flatten(),  # 展平为 [batch_size, 512]
-            torch.nn.Linear(512, 256),  # 增加神经元数量
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Dropout(0.5),  # 防止过拟合
-            torch.nn.Linear(256, 128),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Dropout(0.4),  # 调整dropout率
-            torch.nn.Linear(128, 64),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Dropout(0.3),  # 增加dropout层
-            torch.nn.Linear(64, num_classes)  # 输出分类结果
+        # 简化的分类头，减少神经元数量和dropout层
+        self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),  # 全局平均池化，输出 [batch_size, 128, 1, 1]
+            nn.Flatten(),  # 展平为 [batch_size, 128]
+            nn.Linear(128, 64),  # 减少神经元数量
+            nn.ReLU(inplace=True),
+            nn.Linear(64, num_classes)  # 直接输出分类结果
         )
         
+        # 初始化权重
+        self._initialize_weights()
+    
+    def _initialize_weights(self):
+        """优化的权重初始化方法"""
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                # 使用Kaiming初始化代替默认的正态分布，更适合ReLU激活函数
+                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+    
     def forward(self, x):
         features = self.backbone(x)
         predictions = self.classifier(features)
@@ -105,10 +97,21 @@ model_path = 'models/osu_model.pth'
 if os.path.exists(model_path):
     try:
         print(f"加载模型: {model_path}")
-        model.load_state_dict(torch.load(model_path, map_location=device))
+        # 加载模型权重，处理类别数量不匹配的情况
+        checkpoint = torch.load(model_path, map_location=device)
+        model_dict = model.state_dict()
+        
+        # 过滤掉不匹配的权重（主要是分类器的最后一层）
+        filtered_checkpoint = {k: v for k, v in checkpoint.items() if k in model_dict and v.shape == model_dict[k].shape}
+        
+        # 更新模型权重
+        model_dict.update(filtered_checkpoint)
+        model.load_state_dict(model_dict, strict=False)
+        
         model.to(device)
         model.eval()
         print("模型加载成功！")
+        print(f"加载了 {len(filtered_checkpoint)} 个匹配的权重，跳过了 {len(checkpoint) - len(filtered_checkpoint)} 个不匹配的权重")
     except Exception as e:
         print(f"加载模型失败: {e}")
         exit()
@@ -151,8 +154,8 @@ def test_model(image_path, true_label=None):
 def evaluate_model_performance():
     """评估模型性能，计算准确率、召回率、F1分数等详细指标"""
     # 获取所有类别的图像
-    categories = [1, 2, 3]  # 类别目录
-    category_labels = [0, 1, 2]  # 模型预测的标签
+    categories = [1, 2, 3, 4]  # 类别目录
+    category_labels = [0, 1, 2, 3]  # 模型预测的标签
     category_names = CONFIG['class_names']
     
     # 初始化混淆矩阵

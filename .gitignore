@@ -1,5 +1,14 @@
 __pycache__/
 .venv/
-models/osu_model_temp.pth
-.gitignore
-models/osu_model.pth
+models/
+# 检查你的 .gitignore 是否包含：
+*.pth
+*.pt
+*.pth.tar
+*.ckpt
+
+# PyTorch 模型文件
+*.pkl
+*.pickle
+*.h5
+*.hdf5

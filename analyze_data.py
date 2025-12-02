@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 # 分析训练数据
 train_dir = 'g:/AndyL_osu/train_img'
-categories = ['1', '2', '3']
+categories = ['1', '2', '3', '4']
 
 print("=== 训练数据分布分析 ===")
 for cat in categories:
