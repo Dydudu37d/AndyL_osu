@@ -705,7 +705,7 @@ def main():
     )
     
     # 5. 尝试加载现有模型（如果存在）
-    model_path = 'osu_model.pth'
+    model_path = os.path.join(MODELS_PATH, f'osu_model.pth')
     if os.path.exists(model_path):
         try:
             model.load_state_dict(torch.load(model_path))
@@ -718,7 +718,7 @@ def main():
     model = train_model(model, train_loader, device=device)
     
     # 7. 保存最终模型
-    final_model_path = 'osu_model.pth'
+    final_model_path = os.path.join(MODELS_PATH, f'osu_model.pth')
     torch.save(model.state_dict(), final_model_path)
     print(f"🎉 最终模型已保存至: {final_model_path}")
     
