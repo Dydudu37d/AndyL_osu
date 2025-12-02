@@ -43,8 +43,6 @@ CONFIG = {
     'class_names': ['circle', 'slider', 'spinner', 'back']
 }
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # 指定使用第一張GPU
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128,garbage_collection_threshold:0.8'
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # 調試用
 
 print(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES')}")
