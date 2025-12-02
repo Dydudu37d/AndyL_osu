@@ -1095,13 +1095,14 @@ def run(model: nn.Module):
                                     spinner_hold = True
                                 else:
                                     # 实现快速旋转 - 提高旋转速度
-                                    current_time = time.time() * 2000  # 更高的旋转速度
+                                    current_time = 90  # 更高的旋转速度
                                     circle_radius = 30  # 增大旋转半径
                                     spin_x = int(object_x + circle_radius * math.sin(current_time))
                                     spin_y = int(object_y + circle_radius * math.cos(current_time))
                                     
                                     # 移动鼠标，使用移动持续时间为0以获得最快速度
                                     pyautogui.moveTo(spin_x, spin_y)
+                                    current_time *= 1.5
                             except Exception:
                                 if spinner_hold:
                                     pyautogui.mouseUp()
