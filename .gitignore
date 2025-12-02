@@ -1,2 +1,5 @@
 __pycache__/
 .venv/
+models/osu_model_temp.pth
+.gitignore
+models/osu_model.pth
