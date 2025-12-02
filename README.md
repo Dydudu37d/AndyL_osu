@@ -31,7 +31,6 @@
 ```
 ├── main.py             # 主程序入口，包含实时检测和自动操作逻辑
 ├── analyze_data.py     # 数据处理和分析脚本
-├── test_spinner.py     # spinner对象测试脚本
 ├── models/             # 模型存储目录
 │   └── osu_model_temp.pth  # 训练模型的临时文件(检查点)
 │   └── osu_model.pth  # 训练好的模型文件
