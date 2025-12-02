@@ -1,6 +1,6 @@
 import torch
 
-def check_memory(batch_size=1024):
+def check_memory(batch_size=int(input("请输入batch_size: "))):
     # 模拟一个样本的大小
     sample_size = 224 * 224 * 3  # 假设RGB图像
     params_size = 10_000_000    # 假设1千万参数
@@ -16,7 +16,7 @@ def check_memory(batch_size=1024):
     
     # 检查实际可用显存
     if torch.cuda.is_available():
-        free_mem = torch.cuda.get_device_properties(0).total_memory / (int(input("请输入batch_size: "))**3)
+        free_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
         print(f"GPU显存: {free_mem:.2f} GB")
         
         if total_gb > free_mem * 0.8:  # 保留20%余量
