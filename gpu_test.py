@@ -7,7 +7,7 @@ CONFIG = {
     'num_anchors': 4,
     'confidence_threshold': 0.5,
     'nms_threshold': 0.45,
-    'batch_size': 1024,
+    'batch_size': 128,
     'num_epochs': 500,
     'learning_rate': 0.001,
     # 类别名称映射
@@ -80,8 +80,10 @@ class OsuNet(nn.Module):
         predictions = self.classifier(features)
         return predictions
 
-def check_memory(batch_size=int(input("请输入batch_size: "))):
+def check_memory(batch_size=CONFIG['batch_size']):
     # 模拟一个样本的大小
+    print(f"当前batch_size: {batch_size}")
+    
     model = OsuNet().cuda()
     
     input_tensor = torch.randn(batch_size, 3, 224, 224).cuda()

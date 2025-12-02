@@ -36,7 +36,7 @@ CONFIG = {
     'num_anchors': 4,
     'confidence_threshold': 0.5,
     'nms_threshold': 0.45,
-    'batch_size': 1024,
+    'batch_size': 128,
     'num_epochs': 500,
     'learning_rate': 0.001,
     # 类别名称映射
