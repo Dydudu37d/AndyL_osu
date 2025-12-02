@@ -16,7 +16,7 @@ def check_memory(batch_size=1024):
     
     # 检查实际可用显存
     if torch.cuda.is_available():
-        free_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        free_mem = torch.cuda.get_device_properties(0).total_memory / (int(input("请输入batch_size: "))**3)
         print(f"GPU显存: {free_mem:.2f} GB")
         
         if total_gb > free_mem * 0.8:  # 保留20%余量
