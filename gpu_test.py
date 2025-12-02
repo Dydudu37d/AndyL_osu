@@ -1,6 +1,19 @@
 import torch
 import torch.nn as nn
 
+CONFIG = {
+    'image_size': (160, 90),  # 16:9宽屏尺寸
+    'num_classes': 4,
+    'num_anchors': 4,
+    'confidence_threshold': 0.5,
+    'nms_threshold': 0.45,
+    'batch_size': 1024,
+    'num_epochs': 500,
+    'learning_rate': 0.001,
+    # 类别名称映射
+    'class_names': ['circle', 'slider', 'spinner', 'back']
+}
+
 class OsuNet(nn.Module):
     """Osu游戏对象分类网络 - 优化：简化网络结构，减少计算量"""
     def __init__(self, num_classes=CONFIG['num_classes']):
