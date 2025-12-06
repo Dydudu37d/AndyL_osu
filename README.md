@@ -9,7 +9,7 @@
 ## 功能特点
 
 - **实时对象检测**：使用PyTorch实现的卷积神经网络，实时检测OSU游戏中的各类对象
-- **智能分类识别**：准确识别circle、slider、spinner等不同类型的游戏对象
+- **智能分类识别**：准确识别circle、slider、spinner、back等不同类型的游戏对象
 - **自动鼠标操作**：
   - circle对象的自动点击
   - slider对象的自动拖动
@@ -39,7 +39,8 @@
 ├── train_img/          # 训练图像数据
 │   ├── 1/              # circle类型训练图像
 │   ├── 2/              # slider类型训练图像
-│   └── 3/              # spinner类型训练图像
+│   ├── 3/              # spinner类型训练图像
+│   └── 4/              # back类型训练图像
 └── .gitignore          # Git忽略文件配置
 ```
 
@@ -49,7 +50,7 @@
 
 2. 安装依赖库：
    ```bash
-   pip install torch torchvision opencv-python mss pyautogui numpy
+   pip install torch torchvision opencv-python mss pyautogui numpy keyboard matplotlib Pillow # PyTorch GPU要另外到官網獲取pip鏈接
    ```
 
 3. 克隆或下载项目到本地
