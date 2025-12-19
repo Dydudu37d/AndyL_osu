@@ -37,7 +37,7 @@ CONFIG = {
     'confidence_threshold': 0.5,
     'nms_threshold': 0.45,
     'batch_size': 128,  # 减小batch_size以降低CPU负担
-    'num_epochs': 500,
+    'num_epochs': 50,
     'learning_rate': 0.001,
     # 类别名称映射
     'class_names': ['circle', 'slider', 'spinner', 'back']
