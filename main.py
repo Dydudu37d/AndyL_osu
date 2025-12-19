@@ -36,7 +36,7 @@ CONFIG = {
     'num_anchors': 4,
     'confidence_threshold': 0.5,
     'nms_threshold': 0.45,
-    'batch_size': 1024,
+    'batch_size': 128,  # 减小batch_size以降低CPU负担
     'num_epochs': 500,
     'learning_rate': 0.001,
     # 类别名称映射
@@ -44,8 +44,6 @@ CONFIG = {
 }
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # 調試用
-
-print(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES')}")
 
 class OsuNet(nn.Module):
     """Osu游戏对象分类网络 - 优化：简化网络结构，减少计算量"""
@@ -427,49 +425,52 @@ def train_model(model, train_loader, num_epochs=CONFIG['num_epochs'],
     # 增加训练轮数，让模型有更多时间学习复杂特征
     num_epochs = max(num_epochs, 50)  # 确保至少训练50轮
     
-    for epoch in range(num_epochs):
-        epoch_loss = 0.0
-        batch_count = 0
-        
-        for batch_idx, (images, labels) in enumerate(train_loader):
-            # 确保数据在GPU上
-            images = images.to(device, non_blocking=True)
-            labels = labels.to(device, non_blocking=True)
+    try:
+        for epoch in range(num_epochs):
+            epoch_loss = 0.0
+            batch_count = 0
             
-            # 前向传播
-            outputs = model(images)
+            for batch_idx, (images, labels) in enumerate(train_loader):
+                # 确保数据在GPU上
+                images = images.to(device, non_blocking=True)
+                labels = labels.to(device, non_blocking=True)
+                
+                # 前向传播
+                outputs = model(images)
+                
+                # 计算分类损失，使用类别权重
+                loss = torch.nn.functional.cross_entropy(
+                    outputs,  # 新模型直接输出分类结果 [batch_size, num_classes]
+                    labels,
+                    weight=class_weights  # 添加类别权重
+                )
+                
+                # 反向传播
+                optimizer.zero_grad(set_to_none=True)  # 更快的梯度清零
+                loss.backward()
+                optimizer.step()
+                
+                epoch_loss += loss.item()
+                batch_count += 1
+                
+                # 打印GPU内存使用情况（可选）
+                if batch_idx % 50 == 0 and torch.cuda.is_available():
+                    memory_allocated = torch.cuda.memory_allocated() / 1024**2
+                    print(f"  批次 {batch_idx}, GPU内存: {memory_allocated:.1f}MB")
             
-            # 计算分类损失，使用类别权重
-            loss = torch.nn.functional.cross_entropy(
-                outputs,  # 新模型直接输出分类结果 [batch_size, num_classes]
-                labels,
-                weight=class_weights  # 添加类别权重
-            )
+            # 更新学习率
+            scheduler.step()
             
-            # 反向传播
-            optimizer.zero_grad(set_to_none=True)  # 更快的梯度清零
-            loss.backward()
-            optimizer.step()
+            avg_loss = epoch_loss / batch_count
+            print(f'Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}')
             
-            epoch_loss += loss.item()
-            batch_count += 1
-            
-            # 打印GPU内存使用情况（可选）
-            if batch_idx % 50 == 0 and torch.cuda.is_available():
-                memory_allocated = torch.cuda.memory_allocated() / 1024**2
-                print(f"  批次 {batch_idx}, GPU内存: {memory_allocated:.1f}MB")
-        
-        # 更新学习率
-        scheduler.step()
-        
-        avg_loss = epoch_loss / batch_count
-        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}')
-        
-        # 保存检查点
-        if (epoch + 1) % 20 == 0:  # 更频繁地保存检查点
-            model_path = os.path.join(MODELS_PATH, f'osu_model_temp.pth')
-            torch.save(model.state_dict(), model_path)
-            print(f"💾 模型已保存至: {model_path}")
+            # 保存检查点
+            if (epoch + 1) % 20 == 0:  # 更频繁地保存检查点
+                model_path = os.path.join(MODELS_PATH, f'osu_model_temp.pth')
+                torch.save(model.state_dict(), model_path)
+                print(f"💾 模型已保存至: {model_path}")
+    except KeyboardInterrupt:
+        print("用户已中断训练")
     
     model_path = os.path.join(MODELS_PATH, f'osu_model.pth')
     torch.save(model.state_dict(), model_path)
@@ -701,11 +702,12 @@ def main():
         print(f"  {class_name}: {count} 张图像")
     
     # 创建数据加载器，添加shuffle和num_workers
+    num_workers=max(0,os.cpu_count()-2)  
     train_loader = DataLoader(
         train_dataset, 
         batch_size=CONFIG['batch_size'], 
         shuffle=True,  # 确保数据随机打乱
-        num_workers=0,  # 多线程加载数据
+        num_workers=num_workers,  # 多线程加载数据，设置为CPU核心数的1-2倍
         pin_memory=True  # 加速GPU数据传输
     )
     
@@ -1144,4 +1146,7 @@ def run(model: nn.Module):
 # 如果作为主程序运行，执行主函数
 if __name__ == '__main__':
     main()
+
+
+
 
