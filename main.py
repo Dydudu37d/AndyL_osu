@@ -1,4 +1,4 @@
-import torch
+﻿import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
@@ -14,6 +14,14 @@ import pyautogui
 import time
 from mss import mss  # 用于屏幕捕获
 import math
+import obsws_python as obs
+import socket
+import tempfile
+
+host = socket.gethostbyname(socket.gethostname())
+port = 8005
+
+ws = obs.ReqClient(host=host,port=port)
 
 pyautogui.FAILSAFE = False
 
@@ -23,6 +31,7 @@ MODELS_PATH = os.path.join(ROOT, 'models')
 TRAIN_IMG_PATH = os.path.join(ROOT, 'train_img')
 TEST_IMG_PATH = os.path.join(ROOT, 'test_img')
 RESULTS_PATH = os.path.join(ROOT, 'results')
+TEMP_DIR = tempfile.gettempdir()
 
 for path in [MODELS_PATH, RESULTS_PATH]:
     os.makedirs(path, exist_ok=True)
@@ -224,8 +233,10 @@ def detect_objects(model, image_path, confidence_threshold=CONFIG['confidence_th
     model.eval()
     model.to(device)
     
-    # 加载和预处理图像
-    image = Image.open(image_path).convert('RGB')
+    # 加载和预处理图像 - 修改为灰度图
+    image = Image.open(image_path).convert('L')
+    # 转换回RGB以保持通道数一致
+    image = image.convert('RGB')
     original_size = image.size
     resized_image = transforms.Resize(CONFIG['image_size'])(image)
     image_tensor = transforms.ToTensor()(resized_image).unsqueeze(0).to(device)
@@ -356,7 +367,10 @@ class OsuDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.img_paths[idx]
         try:
-            image = Image.open(img_path).convert('RGB')
+            # 将图像转换为灰度图
+            image = Image.open(img_path).convert('L')
+            # 转换回RGB以保持通道数一致
+            image = image.convert('RGB')
             
             if self.transform:
                 image = self.transform(image)
@@ -828,7 +842,7 @@ def capture_screen():
             # 转换为numpy数组
             img = np.array(screenshot)
             # 转换为RGB格式（mss默认返回BGRA）
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)
             return img
     except Exception as e:
         print(f"屏幕捕获失败: {e}")
@@ -965,7 +979,7 @@ def detect_object_position(screen):
         return center_x, center_y
     
     # 如果没有找到轮廓，返回屏幕中心
-    return screen.shape[1] // 2, screen.shape[0] // 2
+    return pyautogui.position()
 
 def run(model: nn.Module):
     """运行实时检测循环"""
@@ -1022,13 +1036,18 @@ def run(model: nn.Module):
                 # 1. 捕获当前屏幕
                 screen = capture_screen()
                 
-                # 简化图像处理流程
-                # 转换为灰度图
-                screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
                 #移除黑色背景
                 screen[screen < 10] = 0
                 # 确保是3通道图像
                 screen = cv2.cvtColor(screen, cv2.COLOR_GRAY2RGB)
+                cv2.imwrite(os.path.join(TEMP_DIR,"temp_osu_ai_can.png"),screen)
+                ws.set_input_settings(
+                    name="AICam",
+                    settings={
+                        "file":os.path.join(TEMP_DIR,"temp_osu_ai_can.png")
+                    },
+                    overlay=True
+                )
                 
                 # 2. 预处理图像
                 processed_img = preprocess_image(screen).to(device)
@@ -1066,9 +1085,6 @@ def run(model: nn.Module):
                             if slider_hold:
                                 pyautogui.mouseUp()
                                 slider_hold = False
-                            if spinner_hold:
-                                pyautogui.mouseUp()
-                                spinner_hold = False
                             
                             try:
                                 pyautogui.click(object_x, object_y)
@@ -1105,7 +1121,7 @@ def run(model: nn.Module):
                                 else:
                                     # 实现快速旋转 - 提高旋转速度
                                     current_time = 90  # 更高的旋转速度
-                                    circle_radius = 30  # 增大旋转半径
+                                    circle_radius = 50  # 增大旋转半径
                                     spin_x = int(object_x + circle_radius * math.sin(current_time))
                                     spin_y = int(object_y + circle_radius * math.cos(current_time))
                                     
@@ -1131,8 +1147,7 @@ def run(model: nn.Module):
                     if spinner_hold:
                         pyautogui.mouseUp()
                         spinner_hold = False
-                # 移除延迟，最大化处理速度
-                # time.sleep(0.0001)
+                time.sleep(0.005)
     except KeyboardInterrupt:
         pass
     finally:
@@ -1146,7 +1161,3 @@ def run(model: nn.Module):
 # 如果作为主程序运行，执行主函数
 if __name__ == '__main__':
     main()
-
-
-
-
