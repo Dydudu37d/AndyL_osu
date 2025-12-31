@@ -126,9 +126,34 @@ class OsuNet(nn.Module):
         batch_size = predictions.shape[0]
         grid_h, grid_w = 5, 10
         
-        pred = predictions.view(
-            batch_size, self.num_anchors, -1, grid_h, grid_w
-        ).permute(0, 3, 4, 1, 2).contiguous()
+        # 尝试正确地重塑张量
+        try:
+            pred = predictions.view(
+                batch_size, self.num_anchors, -1, grid_h, grid_w
+            ).permute(0, 3, 4, 1, 2).contiguous()
+        except RuntimeError as e:
+            # 如果重塑失败，打印错误信息并尝试不同的方法
+            print(f"张量重塑错误: {e}")
+            print(f"原始形状: {predictions.shape}")
+            
+            # 如果原始张量是 [B, H, W, C] 格式，我们需要先将其重塑为 [B, C, H, W]
+            if len(predictions.shape) == 4 and predictions.shape[3] > predictions.shape[1]:
+                # 假设形状是 [B, H, W, C]
+                predictions = predictions.permute(0, 3, 1, 2).contiguous()
+            
+            # 尝试使用新的形状
+            try:
+                pred = predictions.view(
+                    batch_size, self.num_anchors, -1, grid_h, grid_w
+                ).permute(0, 3, 4, 1, 2).contiguous()
+            except RuntimeError as e2:
+                print(f"重试失败: {e2}")
+                # 返回空结果，避免崩溃
+                return {
+                    'boxes': torch.empty((0, 4)),
+                    'scores': torch.empty((0)),
+                    'classes': torch.empty((0), dtype=torch.long)
+                }
         
         output = []
         
@@ -167,21 +192,46 @@ class OsuNet(nn.Module):
             if boxes:
                 boxes_tensor = torch.tensor(boxes)
                 scores_tensor = torch.tensor(scores)
+                class_tensor = torch.tensor(class_ids, dtype=torch.long)
+                
                 keep_indices = torchvision.ops.nms(boxes_tensor, scores_tensor, nms_thresh)
                 
                 if len(keep_indices) > 0:
-                    detections = torch.cat([
-                        boxes_tensor[keep_indices],
-                        scores_tensor[keep_indices].unsqueeze(1),
-                        torch.tensor(class_ids)[keep_indices].unsqueeze(1).float()
-                    ], dim=1)
-                    output.append(detections)
+                    filtered_boxes = boxes_tensor[keep_indices]
+                    filtered_scores = scores_tensor[keep_indices]
+                    filtered_classes = class_tensor[keep_indices]
+                    
+                    output.append({
+                        'boxes': filtered_boxes,
+                        'scores': filtered_scores,
+                        'classes': filtered_classes
+                    })
                 else:
-                    output.append(torch.empty((0, 6)))
+                    output.append({
+                        'boxes': torch.empty((0, 4)),
+                        'scores': torch.empty((0)),
+                        'classes': torch.empty((0), dtype=torch.long)
+                    })
             else:
-                output.append(torch.empty((0, 6)))
+                output.append({
+                    'boxes': torch.empty((0, 4)),
+                    'scores': torch.empty((0)),
+                    'classes': torch.empty((0), dtype=torch.long)
+                })
         
-        return output
+        # 将批次结果合并为一个字典
+        if output:
+            return {
+                'boxes': torch.cat([r['boxes'] for r in output]),
+                'scores': torch.cat([r['scores'] for r in output]),
+                'classes': torch.cat([r['classes'] for r in output])
+            }
+        else:
+            return {
+                'boxes': torch.empty((0, 4)),
+                'scores': torch.empty((0)),
+                'classes': torch.empty((0), dtype=torch.long)
+            }
 
 
 class YOLOLoss(nn.Module):
@@ -572,11 +622,17 @@ def play_game(model: OsuNet):
     spin_center_x = 0
     spin_center_y = 0
     spin_angle = 0
+    key_down_time = None
+    press_duration_threshold = 0.5  # 长按阈值（秒）
     
     def on_key_event(event):
-        nonlocal running, success, silder_hold, spin_hold
+        nonlocal running, success, silder_hold, spin_hold, key_down_time
+        
         if event.name == 'q':
             if event.event_type == 'down':
+                # 记录按键按下时间
+                key_down_time = time.time()
+                
                 if not running:
                     running = True
                     print("游戏模式启动 - 按 q 暂停")
@@ -587,17 +643,18 @@ def play_game(model: OsuNet):
                     silder_hold = False
                     spin_hold = False
             elif event.event_type == 'up' and running:
-                # 记录按键按下时间
-                key_down_time = time.time()
-                
-                # 等待一小段时间，看是否是短按还是长按
-                time.sleep(0.3)  # 等待300ms判断是否为长按
-                
-                # 如果在这段时间内没有再次按下q键，则为长按
-                if not running:
-                    success = True
-                    print("游戏模式退出")
-                    return False
+                # 计算按键持续时间
+                if key_down_time is not None:
+                    press_duration = time.time() - key_down_time
+                    
+                    # 如果持续时间超过阈值，则为长按
+                    if press_duration >= press_duration_threshold:
+                        success = True
+                        print("游戏模式退出")
+                        return False
+                    
+                    # 重置按键按下时间
+                    key_down_time = None
     
     kb.on_press(on_key_event)
     
