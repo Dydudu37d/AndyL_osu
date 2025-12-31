@@ -634,6 +634,7 @@ def play_game(model: OsuNet):
         nonlocal running, success, silder_hold, spin_hold, key_down_time, key_pressed
         
         if key == keyboard.KeyCode.from_char('q'):
+            key_pressed = False
             if key_down_time is not None:
                 press_duration = time.time() - key_down_time
                 print(f"按键释放，持续时间: {press_duration:.2f}秒 (阈值: {press_duration_threshold}秒)")
