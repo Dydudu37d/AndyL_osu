@@ -587,10 +587,17 @@ def play_game(model: OsuNet):
                     silder_hold = False
                     spin_hold = False
             elif event.event_type == 'up' and running:
-                # 长按检测
-                success = True
-                print("游戏模式退出")
-                return False
+                # 记录按键按下时间
+                key_down_time = time.time()
+                
+                # 等待一小段时间，看是否是短按还是长按
+                time.sleep(0.3)  # 等待300ms判断是否为长按
+                
+                # 如果在这段时间内没有再次按下q键，则为长按
+                if not running:
+                    success = True
+                    print("游戏模式退出")
+                    return False
     
     kb.on_press(on_key_event)
     
@@ -605,6 +612,9 @@ def play_game(model: OsuNet):
     
     model.eval()
     with torch.no_grad():
+        # 确保模型和输入在相同设备上
+        model = model.to(device)
+        
         while not success:
             if not running:
                 time.sleep(0.1)
