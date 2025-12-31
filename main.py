@@ -659,7 +659,8 @@ def play_game(model: OsuNet):
                     key_down_time = None
                     key_pressed = False
     
-    kb.on_press(on_key_event)
+    kb.on_press_key('q', on_key_event)
+    kb.on_release_key('q', on_key_event)
     
     print("Osu AI 游戏助手启动")
     print("按 q 开始/暂停游戏")
