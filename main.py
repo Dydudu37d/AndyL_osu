@@ -124,36 +124,29 @@ class OsuNet(nn.Module):
     
     def decode_predictions(self, predictions, conf_thresh=0.5, nms_thresh=0.4):
         batch_size = predictions.shape[0]
-        grid_h, grid_w = 5, 10
         
-        # 尝试正确地重塑张量
-        try:
+        # 获取实际的特征图尺寸
+        if len(predictions.shape) == 4:  # [B, C, H, W]
+            _, c, h, w = predictions.shape
+            grid_h, grid_w = h, w
+            
+            # 根据通道数计算预测格式
+            pred_per_anchor = c // self.num_anchors
+            if pred_per_anchor < 5:
+                print(f"警告: 每个锚框的预测数({pred_per_anchor})小于预期(5)")
+                pred_per_anchor = 5
+            
+            # 重新排列张量为 [B, H, W, num_anchors, pred_per_anchor]
             pred = predictions.view(
-                batch_size, self.num_anchors, -1, grid_h, grid_w
+                batch_size, self.num_anchors, pred_per_anchor, grid_h, grid_w
             ).permute(0, 3, 4, 1, 2).contiguous()
-        except RuntimeError as e:
-            # 如果重塑失败，打印错误信息并尝试不同的方法
-            print(f"张量重塑错误: {e}")
-            print(f"原始形状: {predictions.shape}")
-            
-            # 如果原始张量是 [B, H, W, C] 格式，我们需要先将其重塑为 [B, C, H, W]
-            if len(predictions.shape) == 4 and predictions.shape[3] > predictions.shape[1]:
-                # 假设形状是 [B, H, W, C]
-                predictions = predictions.permute(0, 3, 1, 2).contiguous()
-            
-            # 尝试使用新的形状
-            try:
-                pred = predictions.view(
-                    batch_size, self.num_anchors, -1, grid_h, grid_w
-                ).permute(0, 3, 4, 1, 2).contiguous()
-            except RuntimeError as e2:
-                print(f"重试失败: {e2}")
-                # 返回空结果，避免崩溃
-                return {
-                    'boxes': torch.empty((0, 4)),
-                    'scores': torch.empty((0)),
-                    'classes': torch.empty((0), dtype=torch.long)
-                }
+        else:
+            print(f"不支持的张量形状: {predictions.shape}")
+            return {
+                'boxes': torch.empty((0, 4)),
+                'scores': torch.empty((0)),
+                'classes': torch.empty((0), dtype=torch.long)
+            }
         
         output = []
         
@@ -624,37 +617,47 @@ def play_game(model: OsuNet):
     spin_angle = 0
     key_down_time = None
     press_duration_threshold = 0.5  # 长按阈值（秒）
+    key_pressed = False
     
     def on_key_event(event):
-        nonlocal running, success, silder_hold, spin_hold, key_down_time
+        nonlocal running, success, silder_hold, spin_hold, key_down_time, key_pressed
         
         if event.name == 'q':
             if event.event_type == 'down':
                 # 记录按键按下时间
                 key_down_time = time.time()
+                key_pressed = True
+                print(f"按键按下，時間: {key_down_time}")
                 
-                if not running:
-                    running = True
-                    print("游戏模式启动 - 按 q 暂停")
-                else:
-                    running = False
-                    print("游戏模式暂停 - 按 q 继续")
-                    # 释放所有按键状态
-                    silder_hold = False
-                    spin_hold = False
-            elif event.event_type == 'up' and running:
-                # 计算按键持续时间
+            elif event.event_type == 'up':
                 if key_down_time is not None:
                     press_duration = time.time() - key_down_time
+                    print(f"按键释放，持续时间: {press_duration:.2f}秒 (阈值: {press_duration_threshold}秒)")
                     
-                    # 如果持续时间超过阈值，则为长按
+                    # 计算按键持续时间
                     if press_duration >= press_duration_threshold:
+                        # 长按 - 退出游戏
                         success = True
-                        print("游戏模式退出")
+                        print(f"检测到长按 ({press_duration:.2f}秒 >= {press_duration_threshold}秒) - 游戏模式退出")
                         return False
+                    else:
+                        # 短按 - 切换运行状态
+                        if not running:
+                            running = True
+                            print(f"短按检测 ({press_duration:.2f}秒 < {press_duration_threshold}秒) - 游戏模式启动")
+                            # 释放所有按键状态
+                            silder_hold = False
+                            spin_hold = False
+                        else:
+                            running = False
+                            print(f"短按检测 ({press_duration:.2f}秒 < {press_duration_threshold}秒) - 游戏模式暂停")
+                            # 释放所有按键状态
+                            silder_hold = False
+                            spin_hold = False
                     
-                    # 重置按键按下时间
+                    # 重置按键状态
                     key_down_time = None
+                    key_pressed = False
     
     kb.on_press(on_key_event)
     
@@ -771,11 +774,11 @@ def play_game(model: OsuNet):
                             else:
                                 spin_hold = False
                                 silder_hold = False
-                                mouse_event(0x0004, center_x, center_y, 0, 0)  # MOUSEEVENTF_LEFTUP                 
+                                api32.mouse_event(0x0004, center_x, center_y, 0, 0)  # MOUSEEVENTF_LEFTUP                 
                 else:
                     spin_hold = False
                     silder_hold = False
-                    mouse_event(0x0004, center_x, center_y, 0, 0)  # MOUSEEVENTF_LEFTUP                                     
+                    api32.mouse_event(0x0004, center_x, center_y, 0, 0)  # MOUSEEVENTF_LEFTUP                                     
             except Exception as e:
                 print(f"遊戲循環錯誤: {e}")
                 continue
