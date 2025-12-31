@@ -7,6 +7,7 @@ import os
 import win32api as api32
 from mss import mss
 from torchvision import transforms
+from pynput.keyboard import Listener
 import keyboard as kb
 import numpy as np
 
@@ -619,48 +620,52 @@ def play_game(model: OsuNet):
     press_duration_threshold = 0.5  # 长按阈值（秒）
     key_pressed = False
     
-    def on_key_event(event):
+    def on_key_press(key):
         nonlocal running, success, silder_hold, spin_hold, key_down_time, key_pressed
         
-        if event.name == 'q':
-            if event.event_type == 'down':
-                # 记录按键按下时间
-                key_down_time = time.time()
-                key_pressed = True
-                print(f"按键按下，時間: {key_down_time}")
-                
-            elif event.event_type == 'up':
-                if key_down_time is not None:
-                    press_duration = time.time() - key_down_time
-                    print(f"按键释放，持续时间: {press_duration:.2f}秒 (阈值: {press_duration_threshold}秒)")
-                    
-                    # 计算按键持续时间
-                    if press_duration >= press_duration_threshold:
-                        # 长按 - 退出游戏
-                        success = True
-                        print(f"检测到长按 ({press_duration:.2f}秒 >= {press_duration_threshold}秒) - 游戏模式退出")
-                        return False
-                    else:
-                        # 短按 - 切换运行状态
-                        if not running:
-                            running = True
-                            print(f"短按检测 ({press_duration:.2f}秒 < {press_duration_threshold}秒) - 游戏模式启动")
-                            # 释放所有按键状态
-                            silder_hold = False
-                            spin_hold = False
-                        else:
-                            running = False
-                            print(f"短按检测 ({press_duration:.2f}秒 < {press_duration_threshold}秒) - 游戏模式暂停")
-                            # 释放所有按键状态
-                            silder_hold = False
-                            spin_hold = False
-                    
-                    # 重置按键状态
-                    key_down_time = None
-                    key_pressed = False
+        if key == keyboard.KeyCode.from_char('q'):
+            # 记录按键按下时间
+            key_down_time = time.time()
+            key_pressed = True
+            print(f"按键按下，時間: {key_down_time}")
+            return False  # 阻止默认行为
     
-    kb.on_press(on_key_event)
-    kb.on_release(on_key_event)
+    def on_key_release(key):
+        nonlocal running, success, silder_hold, spin_hold, key_down_time, key_pressed
+        
+        if key == keyboard.KeyCode.from_char('q'):
+            if key_down_time is not None:
+                press_duration = time.time() - key_down_time
+                print(f"按键释放，持续时间: {press_duration:.2f}秒 (阈值: {press_duration_threshold}秒)")
+                
+                # 计算按键持续时间
+                if press_duration >= press_duration_threshold:
+                    # 长按 - 退出游戏
+                    success = True
+                    print(f"检测到长按 ({press_duration:.2f}秒 >= {press_duration_threshold}秒) - 游戏模式退出")
+                    return False
+                else:
+                    # 短按 - 切换运行状态
+                    if not running:
+                        running = True
+                        print(f"短按检测 ({press_duration:.2f}秒 < {press_duration_threshold}秒) - 游戏模式启动")
+                        # 释放所有按键状态
+                        silder_hold = False
+                        spin_hold = False
+                    else:
+                        running = False
+                        print(f"短按检测 ({press_duration:.2f}秒 < {press_duration_threshold}秒) - 游戏模式暂停")
+                        # 释放所有按键状态
+                        silder_hold = False
+                        spin_hold = False
+                
+                # 重置按键状态
+                key_down_time = None
+                key_pressed = False
+    
+    # 启动键盘监听器
+    from pynput import keyboard
+    keyboard.Listener(on_press=on_key_press, on_release=on_key_release).start()
     
     print("Osu AI 游戏助手启动")
     print("按 q 开始/暂停游戏")
