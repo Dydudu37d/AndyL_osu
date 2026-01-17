@@ -1,0 +1,14 @@
+# Ignore media and osu! related files
+*.mp4
+*.osr
+*.osu
+*.osz
+
+# Ignore archives and partial downloads
+*.zip
+*.part
+
+# Ignore model and log/output files
+*.pth
+*.err
+*.out
